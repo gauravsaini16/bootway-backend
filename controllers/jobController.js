@@ -1,4 +1,4 @@
-const Job = require('../models/Job');
+const Job = require('../models/job');
 
 // @desc    Get all jobs
 // @route   GET /api/jobs
