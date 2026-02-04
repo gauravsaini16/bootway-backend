@@ -20,6 +20,7 @@ const corsOptions = {
     'http://localhost:3002',
     'http://localhost:5173',
     'http://localhost:3000/admin',
+    'https://bootway-frontend.vercel.app',
     process.env.FRONTEND_URL
   ].filter(Boolean),
   credentials: true,
