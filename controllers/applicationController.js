@@ -111,22 +111,8 @@ exports.applyForJob = [
       // Upload resume to Cloudinary if file is provided
       if (req.file) {
         try {
-          const result = await cloudinary.uploader.upload_stream({
-            folder: 'bootway/resumes',
-            public_id: `resume-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
-            resource_type: 'auto',
-            format: 'auto'
-          }, (error, result) => {
-            if (error) {
-              console.error('Cloudinary upload error:', error);
-              return next(error);
-            }
-            return result;
-          });
-          
-          // Alternative simpler upload method
           const uploadResult = await new Promise((resolve, reject) => {
-            const stream = cloudinary.uploader.upload_stream(
+            cloudinary.uploader.upload_stream(
               {
                 folder: 'bootway/resumes',
                 public_id: `resume-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
@@ -136,9 +122,7 @@ exports.applyForJob = [
                 if (error) reject(error);
                 else resolve(result);
               }
-            );
-            
-            stream.end(req.file.buffer);
+            ).end(req.file.buffer);
           });
           
           resumeUrl = uploadResult.secure_url;

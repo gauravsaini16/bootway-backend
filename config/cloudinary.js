@@ -1,11 +1,5 @@
-const cloudinary = require('cloudinary').v2;
+const cloudinary = require('cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-
-// Debug environment variables
-console.log('🔧 Cloudinary Environment Variables:');
-console.log('  CLOUDINARY_CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME);
-console.log('  CLOUDINARY_API_KEY:', process.env.CLOUDINARY_API_KEY ? 'Set' : 'Not set');
-console.log('  CLOUDINARY_API_SECRET:', process.env.CLOUDINARY_API_SECRET ? 'Set' : 'Not set');
 
 // Configure Cloudinary
 cloudinary.config({
