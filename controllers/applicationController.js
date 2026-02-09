@@ -1,5 +1,33 @@
 const Application = require('../models/Application');
 const Job = require('../models/job');
+const { cloudinary } = require('../config/cloudinary');
+const multer = require('multer');
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept common document formats
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'image/jpg'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, Word, and image files are allowed.'), false);
+    }
+  }
+});
 
 // @desc    Get all applications
 // @route   GET /api/applications
@@ -58,60 +86,111 @@ exports.getApplication = async (req, res, next) => {
 // @desc    Apply for a job
 // @route   POST /api/applications
 // @access  Public (anyone can apply)
-exports.applyForJob = async (req, res, next) => {
-  try {
-    const { jobId, candidateName, candidateEmail, candidatePhone, resume, coverLetter } = req.body;
-
-    if (!jobId || !candidateName || !candidateEmail) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide all required fields (jobId, candidateName, candidateEmail)'
+exports.applyForJob = [
+  upload.single('resume'),
+  async (req, res, next) => {
+    try {
+      console.log('📦 Request body keys:', Object.keys(req.body));
+      console.log('📦 Request body:', req.body);
+      console.log('📦 Request file:', req.file ? `File(${req.file.originalname}, ${req.file.size} bytes)` : 'No file');
+      
+      const { jobId, candidateName, candidateEmail, candidatePhone } = req.body;
+      
+      console.log('📝 Extracted data:', {
+        jobId,
+        candidateName,
+        candidateEmail,
+        candidatePhone,
+        jobIdType: typeof jobId,
+        candidateNameType: typeof candidateName,
+        candidateEmailType: typeof candidateEmail
       });
-    }
+      
+      let resumeUrl = null;
+      
+      // Upload resume to Cloudinary if file is provided
+      if (req.file) {
+        try {
+          const result = await cloudinary.uploader.upload_stream({
+            folder: 'bootway/resumes',
+            public_id: `resume-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
+            resource_type: 'auto',
+            format: 'auto'
+          }, (error, result) => {
+            if (error) {
+              console.error('Cloudinary upload error:', error);
+              return next(error);
+            }
+            return result;
+          });
+          
+          // Alternative simpler upload method
+          const uploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              {
+                folder: 'bootway/resumes',
+                public_id: `resume-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
+                resource_type: 'auto'
+              },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+              }
+            );
+            
+            stream.end(req.file.buffer);
+          });
+          
+          resumeUrl = uploadResult.secure_url;
+          console.log('✅ Resume uploaded to Cloudinary:', resumeUrl);
+        } catch (uploadError) {
+          console.error('❌ Cloudinary upload failed:', uploadError);
+          return next(new Error('Failed to upload resume to cloud storage'));
+        }
+      }
 
-    // Check if job exists
-    const job = await Job.findById(jobId);
-    if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Job not found'
+      if (!jobId || !candidateName || !candidateEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide all required fields (jobId, candidateName, candidateEmail)'
+        });
+      }
+
+      // Check if already applied
+      const existingApplication = await Application.findOne({
+        jobId,
+        candidateEmail: candidateEmail.toLowerCase()
       });
-    }
 
-    // Check if already applied
-    const existingApplication = await Application.findOne({
-      jobId,
-      candidateEmail: candidateEmail.toLowerCase()
-    });
+      if (existingApplication) {
+        return res.status(409).json({
+          success: false,
+          message: 'You have already applied for this job'
+        });
+      }
 
-    if (existingApplication) {
-      return res.status(409).json({
-        success: false,
-        message: 'You have already applied for this job'
+      // Create application
+      const application = await Application.create({
+        jobId,
+        candidateId: req.user?.id || null,
+        candidateName,
+        candidateEmail: candidateEmail.toLowerCase(),
+        candidatePhone,
+        resume: resumeUrl,
+        coverLetter: req.body.coverLetter,
+        status: 'applied'
       });
+
+      res.status(201).json({
+        success: true,
+        message: 'Application submitted successfully',
+        data: application
+      });
+    } catch (err) {
+      next(err);
     }
-
-    // Create application
-    const application = await Application.create({
-      jobId,
-      candidateId: req.user?.id || null,
-      candidateName,
-      candidateEmail: candidateEmail.toLowerCase(),
-      candidatePhone,
-      resume,
-      coverLetter,
-      status: 'applied'
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Application submitted successfully',
-      data: application
-    });
-  } catch (err) {
-    next(err);
   }
-};
+];
 
 // @desc    Update application status
 // @route   PUT /api/applications/:id
