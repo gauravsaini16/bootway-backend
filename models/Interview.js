@@ -15,7 +15,7 @@ const interviewSchema = new mongoose.Schema(
     candidateId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true
+      required: false
     },
     scheduledBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -37,8 +37,7 @@ const interviewSchema = new mongoose.Schema(
     },
     interviewers: [
       {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        type: String
       }
     ],
     meetingLink: {

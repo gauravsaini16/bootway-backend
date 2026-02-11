@@ -17,7 +17,6 @@ exports.getInterviews = async (req, res, next) => {
       .populate('jobId', 'title department')
       .populate('candidateId', 'fullName email')
       .populate('scheduledBy', 'fullName')
-      .populate('interviewers', 'fullName email')
       .sort({ scheduledDate: 1 });
 
     res.status(200).json({
@@ -39,8 +38,7 @@ exports.getInterview = async (req, res, next) => {
       .populate('applicationId')
       .populate('jobId')
       .populate('candidateId')
-      .populate('scheduledBy', 'fullName')
-      .populate('interviewers', 'fullName email');
+      .populate('scheduledBy', 'fullName');
 
     if (!interview) {
       return res.status(404).json({
@@ -75,7 +73,7 @@ exports.scheduleInterview = async (req, res, next) => {
       location
     } = req.body;
 
-    if (!applicationId || !jobId || !candidateId || !scheduledDate) {
+    if (!applicationId || !jobId || !scheduledDate) {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields'

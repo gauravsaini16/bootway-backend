@@ -1,6 +1,7 @@
 const Application = require('../models/Application');
 const Job = require('../models/job');
-const { cloudinary } = require('../config/cloudinary');
+const cloudinary = require('cloudinary').v2;
+require('../config/cloudinary'); // Ensure config is loaded
 const multer = require('multer');
 
 // Configure multer for file uploads
@@ -20,7 +21,7 @@ const upload = multer({
       'image/png',
       'image/jpg'
     ];
-    
+
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -93,9 +94,9 @@ exports.applyForJob = [
       console.log('📦 Request body keys:', Object.keys(req.body));
       console.log('📦 Request body:', req.body);
       console.log('📦 Request file:', req.file ? `File(${req.file.originalname}, ${req.file.size} bytes)` : 'No file');
-      
+
       const { jobId, candidateName, candidateEmail, candidatePhone } = req.body;
-      
+
       console.log('📝 Extracted data:', {
         jobId,
         candidateName,
@@ -105,31 +106,64 @@ exports.applyForJob = [
         candidateNameType: typeof candidateName,
         candidateEmailType: typeof candidateEmail
       });
-      
+
       let resumeUrl = null;
-      
+
       // Upload resume to Cloudinary if file is provided
       if (req.file) {
         try {
-          const uploadResult = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_stream(
+          console.log('🚀 Starting Cloudinary upload for:', req.file.originalname);
+
+          // Debug config
+          const config = cloudinary.config();
+          console.log('🔧 Cloudinary Config Active:', {
+            cloud_name: config.cloud_name,
+            api_key_present: !!config.api_key
+          });
+
+          const uploadPromise = new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
               {
                 folder: 'bootway/resumes',
                 public_id: `resume-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
                 resource_type: 'auto'
               },
               (error, result) => {
-                if (error) reject(error);
-                else resolve(result);
+                if (error) {
+                  console.error('❌ Cloudinary stream error:', error);
+                  reject(error);
+                } else {
+                  console.log('✅ Cloudinary stream success:', result.secure_url);
+                  resolve(result);
+                }
               }
-            ).end(req.file.buffer);
+            );
+
+            stream.on('error', (err) => {
+              console.error('❌ Stream error event:', err);
+              reject(err);
+            });
+
+            stream.end(req.file.buffer);
           });
-          
+
+          // 15 second timeout
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Cloudinary upload timed out after 15s')), 15000)
+          );
+
+          const uploadResult = await Promise.race([uploadPromise, timeoutPromise]);
+
           resumeUrl = uploadResult.secure_url;
-          console.log('✅ Resume uploaded to Cloudinary:', resumeUrl);
+          console.log('✅ Resume uploaded successfully:', resumeUrl);
         } catch (uploadError) {
-          console.error('❌ Cloudinary upload failed:', uploadError);
-          return next(new Error('Failed to upload resume to cloud storage'));
+          console.error('❌ Cloudinary upload failed:', uploadError.message);
+          // Don't fail the whole application if resume upload fails? 
+          // Probably should fail because resume is required.
+          return res.status(500).json({
+            success: false,
+            message: `Resume upload failed: ${uploadError.message}. Please try again or contact support.`
+          });
         }
       }
 
