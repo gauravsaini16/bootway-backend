@@ -301,8 +301,22 @@ exports.getJobApplications = async (req, res, next) => {
 // @access  Private/Candidate
 exports.getMyApplications = async (req, res, next) => {
   try {
+    // 1. Link any existing anonymous applications with this user's email
+    // This fixes the issue where applications made before account creation (or without auth) aren't visible
+    if (req.user && req.user.email) {
+      await Application.updateMany(
+        {
+          candidateEmail: req.user.email,
+          candidateId: null
+        },
+        {
+          candidateId: req.user.id
+        }
+      );
+    }
+
     const applications = await Application.find({ candidateId: req.user?.id })
-      .populate('jobId', 'title department location')
+      .populate('jobId', 'title department location type')
       .sort({ appliedAt: -1 });
 
     res.status(200).json({

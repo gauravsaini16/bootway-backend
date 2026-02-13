@@ -9,7 +9,7 @@ const {
   getJobApplications,
   getMyApplications
 } = require('../controllers/applicationController');
-const { protect, authorizeAdminHR } = require('../middleware/auth');
+const { protect, authorizeAdminHR, optionalProtect } = require('../middleware/auth');
 
 // GET all applications (Admin/HR only)
 router.get('/', protect, authorizeAdminHR(), getApplications);
@@ -24,7 +24,7 @@ router.get('/candidate/my-applications', protect, getMyApplications);
 router.get('/:id', getApplication);
 
 // POST apply for job
-router.post('/', applyForJob);
+router.post('/', optionalProtect, applyForJob);
 
 // PUT update application (Admin/HR only)
 router.put('/:id', protect, authorizeAdminHR(), updateApplication);

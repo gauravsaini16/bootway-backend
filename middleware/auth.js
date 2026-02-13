@@ -30,6 +30,32 @@ exports.protect = (req, res, next) => {
   }
 };
 
+// Optional protect - verify JWT token if present, but don't error if not
+exports.optionalProtect = (req, res, next) => {
+  let token;
+
+  // Check for token in headers
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  // If no token, just proceed without setting req.user
+  if (!token) {
+    return next();
+  }
+
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production');
+    req.user = decoded;
+    next();
+  } catch (err) {
+    // If token is invalid, just proceed without setting req.user (treat as public user)
+    // Or warn? stick to safe fail for now.
+    next();
+  }
+};
+
 // Helper function to check if user has admin/hr access
 exports.isAdminOrHR = (user) => {
   return user && (user.role === 'admin' || user.role === 'hr');
