@@ -140,7 +140,7 @@ exports.login = async (req, res, next) => {
 exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user?.id).select('-password');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -179,7 +179,7 @@ exports.updatePassword = async (req, res, next) => {
     }
 
     const user = await User.findById(req.user?.id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -200,7 +200,95 @@ exports.updatePassword = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Password updated successfully'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Forgot Password
+// @route   POST /api/auth/forgotpassword
+// @access  Public
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const user = await User.findOne({ email: req.body.email.toLowerCase() });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'There is no user with that email'
+      });
+    }
+
+    // Get reset token
+    const resetToken = user.getResetPasswordToken();
+
+    await user.save({ validateBeforeSave: false });
+
+    // Mock Email Sending
+    // In production, you would send an email here
+    const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/resetpassword/${resetToken}`;
+    console.log(`Reset Token: ${resetToken}`);
+    console.log(`Reset URL: ${resetUrl}`);
+
+    res.status(200).json({
+      success: true,
+      data: 'Email sent',
+      // Return the token for frontend to use (Simulation Mode)
+      resetToken: resetToken
+    });
+  } catch (err) {
+    console.error(err);
+    // Only try to save if we found the user
+    // We can't easily access the user variable here due to scope,
+    // so we'll just log the error and return failure.
+    // In a real scenario, we'd restructure to have user available or look it up again if needed,
+    // but for this crash fix, preventing the access is enough.
+
+    return res.status(500).json({
+      success: false,
+      message: 'Email could not be sent'
+    });
+  }
+};
+
+// @desc    Reset Password
+// @route   PUT /api/auth/resetpassword/:resettoken
+// @access  Public
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const crypto = require('crypto');
+    // Get hashed token
+    const resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(req.params.resettoken)
+      .digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
+
+    // Set new password
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    const token = generateToken(user._id, user.email, user.role);
+
+    res.status(200).json({
+      success: true,
+      token,
+      data: user
     });
   } catch (err) {
     next(err);
