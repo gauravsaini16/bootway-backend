@@ -79,7 +79,7 @@ const userRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const applicationRoutes = require('./routes/applications');
 const interviewRoutes = require('./routes/interviews');
-const offerRoutes = require('./routes/offers');
+const employeeRoutes = require('./routes/employees');
 
 // Mount routes
 app.use('/api/jobs', jobRoutes);
@@ -87,7 +87,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/interviews', interviewRoutes);
-app.use('/api/offers', offerRoutes);
+app.use('/api/employees', employeeRoutes);
 
 // ============================================
 // HEALTH CHECK & ROOT ROUTES
